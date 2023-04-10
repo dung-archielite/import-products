@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController\AuthController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('login', [AuthController::class, 'login'])->name('login');
 Route::get('products', [ProductController::class, '__invoke']);
+Route::post('products/store', [ProductController::class, 'import'])->name('products.store');
 
 Route::get('/', function () {
     return view('welcome');

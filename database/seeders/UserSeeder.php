@@ -22,7 +22,7 @@ class UserSeeder extends Seeder
                 'name'=> $faker->firstName . ' ' . $faker->lastName,
                 'email'=> $faker->email,
                 'password'=>bcrypt('12345678'),
-                'level'=> $faker->randomElement(UserLevelEnum::getValues()),
+                'level'=> $faker->randomElement(['1', '0']),
                 'remember_token'=>null,
             ];
         }

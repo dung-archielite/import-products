@@ -15,10 +15,6 @@ mix.js('resources/js/app.js', 'public/js')
     .postCss('resources/css/app.css', 'public/css', [
         require("tailwindcss"),
     ])
-    .js('resources/js/customizer.js', 'public/js')
-    .js('resources/js/demo.js', 'public/js')
-    .js('resources/js/simple-datatables.js', 'public/js')
-    .css('resources/css/custom.css', 'public/css')
     .disableNotifications();
 if (mix.inProduction()) {
     mix.version();

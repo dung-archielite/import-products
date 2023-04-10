@@ -6,8 +6,13 @@
     <link href="{{ asset('css/app.css') }}" rel="stylesheet">
 </head>
 <body>
-<h1 class="text-3xl font-bold underline">
+<h1 class="text-3xl font-bold underline text-red-400">
     Hello world!
+    <form action="{{ route('products.store') }}" method="post" enctype="multipart/form-data">
+        @csrf
+        <input type="file" name="file">
+        <button>submit</button>
+    </form>
 </h1>
 </body>
 </html>
