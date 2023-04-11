@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ImportProductsRequest;
+use App\Models\LogFiles;
 use App\Models\Product;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -13,6 +13,9 @@ use Rap2hpoutre\FastExcel\FastExcel;
 
 class ProductController extends Controller
 {
+    private int $countSeat = 1;
+    private array $listError = [];
+
     public function index()
     {
         return view('products.index');
@@ -21,61 +24,73 @@ class ProductController extends Controller
     public function import(ImportProductsRequest $request)
     {
         $fileName = $request->file('file')->getClientOriginalName();
-//        if (Storage::exists('csv/' .$fileName) ) {
-//            return response()->json([
-//                'message' => 'File already exists'
-//            ]);
-//        }
-
-//        change store to storeAs storeAs('csv', $fileName)
-        $file = $request->file('file')->store('csv');
-        $products = (new FastExcel)->import(Storage::disk('local')->path($file), function ($line) {
-            return [
-                'name' => $line['Name'],
-                'sku' => $line['SKU'],
-                'description' => $line['Description'],
-                'price' => $line['Price'],
-                'stock' => $line['Stock'],
-                'status' => $line['Status'],
-                'type' => $line['Type'],
-                'vendor' => $line['Vendor'],
-            ];
-        });
-
-        $listError = [];
-        $lengthChunk = 10000;
-        $productChunk = array_chunk($products->toArray(), $lengthChunk);
-
-        foreach ($productChunk as $keyChunk => $arrProduct){
-            foreach ($arrProduct as $key => $product){
-                $validator = Validator::make($product, [
-                    'name' => 'required|string',
-                    'sku' => 'required|string',
-                    'description' => 'required|string',
-                    'price' => 'required|between:0,99.99',
-                    'stock' => 'required|integer',
-                    'status' => ['required', Rule::in(['Drafted', 'Published']),],
-                    'type' => 'required|string',
-                    'vendor' => 'required|string',
-                ]);
-
-                if($validator->fails()) {
-                    $message = implode('', $validator->errors()->all());
-                    $listError[$keyChunk*$lengthChunk + $key+2] = 'Line '.($keyChunk*$lengthChunk + $key+2).': '. $message;
-                } else {
-                    DB::beginTransaction();
-                    try {
-                        Product::insert($product);
-                        DB::commit();
-                    } catch (\Exception $e) {
-                        DB::rollback();
-                    }
-                }
-            }
+        $log = new LogFiles();
+        if ($log->checkCsv($fileName) ) {
+            return response()->json([
+                'message' => 'File already exists'
+            ]);
         }
 
-        dd($listError);
+        $file = $request->file('file')->store('csv');
+        $listError = [];
 
-        return view('welcome', compact('listError'))->with('success', 'Import Succsess');
+        $products = (new FastExcel)->import(Storage::disk('local')->path($file), function ($line) use ($file) {
+            $this->countSeat ++;
+            $row = $this->countSeat;
+            try {
+                $data = [
+                    'name' => $line['Name'],
+                    'sku' => $line['SKU'],
+                    'description' => $line['Description'],
+                    'price' => $line['Price'],
+                    'stock' => $line['Stock'],
+                    'status' => $line['Status'],
+                    'type' => $line['Type'],
+                    'vendor' => $line['Vendor'],
+                ];
+            } catch (\Exception $e) {
+                Storage::disk('local')->delete($file);
+                return view('welcome')->with('error', $e->getMessage());
+            }
+
+            $validator = Validator::make($data, [
+                'name' => ['required', 'string'],
+                'sku' => ['required', 'string'],
+                'description' => ['required', 'string'],
+                'price' => ['required', 'numeric'],
+                'stock' => ['required', 'integer'],
+                'status' => ['required', Rule::in(['Drafted', 'Published']),],
+                'type' => ['required', 'string'],
+                'vendor' => ['required', 'string'],
+            ]);
+            if ($validator->fails()) {
+                $message = implode('', $validator->errors()->all());
+                $this->listError[] = 'Line '. $row . ': ' . $message;
+            } else{
+                return $data;
+            }
+        });
+        Storage::disk('local')->delete($file);
+        $lengthChunk = 10000;
+        $productChunk = array_chunk($products->toArray(), $lengthChunk);
+        DB::beginTransaction();
+        try {
+            foreach ($productChunk as $arrProduct){
+                foreach ($arrProduct as $key => $product){
+                    $error = $product;
+                    Product::insert($product);
+                }
+            }
+            DB::commit();
+            LogFiles::insert([
+                'name' => $fileName
+            ]);
+            Storage::disk('local')->delete($file);
+            return view('welcome', compact('listError'))->with('success', 'Import Succsess');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Storage::disk('local')->delete($file);
+            return view('welcome', compact('listError'))->with('error', 'Import Error');
+        }
     }
 }
