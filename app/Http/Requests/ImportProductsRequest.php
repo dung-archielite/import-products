@@ -9,7 +9,7 @@ class ImportProductsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'file' => ['required', 'file', 'mimes:csv, txt', 'max:100000',],
+            'file' => ['required', 'file', 'mimes:csv, txt', 'max:100000'],
         ];
     }
 }

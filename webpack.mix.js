@@ -15,6 +15,8 @@ mix.js('resources/js/app.js', 'public/js')
     .postCss('resources/css/app.css', 'public/css', [
         require("tailwindcss"),
     ])
+    .js('resources/js/library/toast/toasting.js', 'public/js/toast')
+    .postCss('resources/css/library/toast/toasting.css', 'public/css/toast')
     .disableNotifications();
 if (mix.inProduction()) {
     mix.version();

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ImportProductsRequest;
+use App\Http\Service\ImportProductService;
 use App\Models\LogFiles;
 use App\Models\Product;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,9 @@ use Rap2hpoutre\FastExcel\FastExcel;
 
 class ProductController extends Controller
 {
+    public function __construct(protected ImportProductService $importProductService)
+    {
+    }
     private int $countSeat = 1;
     private array $listError = [];
 
@@ -25,17 +29,16 @@ class ProductController extends Controller
     {
         $fileName = $request->file('file')->getClientOriginalName();
         $log = new LogFiles();
-        if ($log->checkCsv($fileName) ) {
+        if ($log->checkCsv($fileName)) {
             return response()->json([
-                'message' => 'File already exists'
+                'error' => 'File already exists'
             ]);
         }
 
         $file = $request->file('file')->store('csv');
-        $listError = [];
 
         $products = (new FastExcel)->import(Storage::disk('local')->path($file), function ($line) use ($file) {
-            $this->countSeat ++;
+            $this->countSeat++;
             $row = $this->countSeat;
             try {
                 $data = [
@@ -47,10 +50,13 @@ class ProductController extends Controller
                     'status' => $line['Status'],
                     'type' => $line['Type'],
                     'vendor' => $line['Vendor'],
+                    'created_at' => $line['Created At'],
                 ];
             } catch (\Exception $e) {
                 Storage::disk('local')->delete($file);
-                return view('welcome')->with('error', $e->getMessage());
+                return response()->json([
+                    'error' => $e->getMessage(),
+                ]);
             }
 
             $validator = Validator::make($data, [
@@ -62,35 +68,43 @@ class ProductController extends Controller
                 'status' => ['required', Rule::in(['Drafted', 'Published']),],
                 'type' => ['required', 'string'],
                 'vendor' => ['required', 'string'],
+//                'created_at' => ['required', 'date_format:Y-m-d H:i:s'],
             ]);
             if ($validator->fails()) {
                 $message = implode('', $validator->errors()->all());
-                $this->listError[] = 'Line '. $row . ': ' . $message;
-            } else{
+                $this->listError[] = 'Line ' . $row . ': ' . $message;
+            } else {
                 return $data;
             }
         });
+//        dd($products);
         Storage::disk('local')->delete($file);
         $lengthChunk = 10000;
         $productChunk = array_chunk($products->toArray(), $lengthChunk);
-        DB::beginTransaction();
-        try {
-            foreach ($productChunk as $arrProduct){
-                foreach ($arrProduct as $key => $product){
-                    $error = $product;
+//        dd($productChunk);
+        foreach ($productChunk as $arrProduct) {
+            try {
+                DB::beginTransaction();
+                foreach ($arrProduct as $key => $product) {
                     Product::insert($product);
                 }
+                DB::commit();
+            } catch (\Exception $e) {
+                DB::rollBack();
+                Storage::disk('local')->delete($file);
+                return response()->json([
+                    'error' => $e->getMessage(),
+                    'data' =>  $this->listError,
+                ]);
             }
-            DB::commit();
-            LogFiles::insert([
-                'name' => $fileName
-            ]);
-            Storage::disk('local')->delete($file);
-            return view('welcome', compact('listError'))->with('success', 'Import Succsess');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Storage::disk('local')->delete($file);
-            return view('welcome', compact('listError'))->with('error', 'Import Error');
         }
+
+        LogFiles::create([
+            'name' => $fileName
+        ]);
+        Storage::disk('local')->delete($file);
+        $listError = $this->listError;
+        $products = Product::query()->paginate('20');
+        return view('products.list', compact('products', 'listError'));
     }
 }

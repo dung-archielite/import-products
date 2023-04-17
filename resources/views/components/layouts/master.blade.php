@@ -7,25 +7,39 @@
     <title>{{ config('name') }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&amp;display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('css/app.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/custom.css') }}">
-
+    <link rel="stylesheet" href="{{ asset('css/toast/toasting.css') }}">
+    <script src="{{ asset('js/toast/toasting.js') }}"></script>
     @stack('styles')
 </head>
-<body class="h-full font-sans antialiased text-base font-normal text-gray-600 dark:text-gray-400 dark:bg-gray-900">
-<div id="app" class="h-full">
-    {{ $slot }}
+<body>
 
-{{--start toast or message--}}
+{{ $slot }}
 
-{{--end toast or message--}}
-</div>
-
-<script src="{{ asset('js/app.js') }}"></script>
-<script src="{{ asset('js/customizer.js') }}"></script>
-<script src="{{ asset('js/demo.js') }}"></script>
-
-@stack('scripts')
 </body>
+<script src="{{ asset('js/app.js') }}"></script>
+@stack('scripts')
+<script>
+    $(window).on('load', function () {
+        @if ($errors->any())
+            @foreach ($errors->all() as $error)
+                toasting.create({
+                    "title": "Error",
+                    "text": "{{ $error }}",
+                    "type": "error",
+                    "progressBarType": "rainbow"
+                });
+            @endforeach
+        @endif
+        @if (session()->has('success'))
+            toasting.create({
+                "title": "Success",
+                "text": "{{session()->get('success')}}",
+                "type": "success",
+                "progressBarType": "rainbow"
+            });
+        @endif
+    });
+</script>
 </html>
