@@ -27,6 +27,7 @@ class ProductController extends Controller
 
     public function import(ImportProductsRequest $request)
     {
+        ini_set('max_execution_time', '300');
         $fileName = $request->file('file')->getClientOriginalName();
         $log = new LogFiles();
         if ($log->checkCsv($fileName)) {
@@ -38,6 +39,7 @@ class ProductController extends Controller
         $file = $request->file('file')->store('csv');
 
         $products = (new FastExcel)->import(Storage::disk('local')->path($file), function ($line) use ($file) {
+            set_time_limit(0);
             $this->countSeat++;
             $row = $this->countSeat;
             try {
@@ -68,7 +70,6 @@ class ProductController extends Controller
                 'status' => ['required', Rule::in(['Drafted', 'Published']),],
                 'type' => ['required', 'string'],
                 'vendor' => ['required', 'string'],
-//                'created_at' => ['required', 'date_format:Y-m-d H:i:s'],
             ]);
             if ($validator->fails()) {
                 $message = implode('', $validator->errors()->all());
@@ -77,12 +78,11 @@ class ProductController extends Controller
                 return $data;
             }
         });
-//        dd($products);
         Storage::disk('local')->delete($file);
         $lengthChunk = 10000;
         $productChunk = array_chunk($products->toArray(), $lengthChunk);
-//        dd($productChunk);
         foreach ($productChunk as $arrProduct) {
+            set_time_limit(0);
             try {
                 DB::beginTransaction();
                 foreach ($arrProduct as $key => $product) {
