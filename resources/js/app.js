@@ -52,6 +52,10 @@ openMenu.click(() => {
     mobileMenu.toggleClass('hidden');
 })
 
+$('#file_input').change(() => {
+    btnSubmit.prop("disabled", false);
+})
+
 const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
 let productList = $('#product-list');
 let processLoading = $('#process-loading');
